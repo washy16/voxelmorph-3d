@@ -1,0 +1,7 @@
+IMG_SHAPE = (96, 96, 96, 1)
+
+LR = 1e-4
+BATCH_SIZE = 1
+EPOCHS = 20
+
+LAMBDA_REG = 1.0
