@@ -8,7 +8,7 @@ from losses import total_loss
 # CONFIG
 # =========================
 EPOCHS = 20
-BATCH_SIZE = 2   # 🔥 augmente à 4 si ça passe
+BATCH_SIZE = 1   # 🔥 augmente à 4 si ça passe
 LR = 1e-4
 
 
@@ -35,6 +35,10 @@ def train():
 
     print("🚀 LOADING DATA...")
     train_fixed, train_moving, val_fixed, val_moving = load_data()
+    train_fixed = train_fixed[:50]
+    train_moving = train_moving[:50]
+    val_fixed = val_fixed[:10]
+    val_moving = val_moving[:10]
 
     print(f"✔ TRAIN SIZE: {len(train_fixed)}")
     print(f"✔ VAL SIZE: {len(val_fixed)}")

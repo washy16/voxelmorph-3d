@@ -16,13 +16,12 @@ def fix_shape(x):
 
 
 def load_npz_file(path):
+    data = np.load(path, mmap_mode='r')
 
-    data = np.load(path)
+    print("Keys:", data.files)  # debug optionnel
 
-    keys = list(data.keys())
-
-    fixed = fix_shape(data[keys[0]])
-    moving = fix_shape(data[keys[1]])
+    fixed = fix_shape(data['fixed'])
+    moving = fix_shape(data['moving'])
 
     return fixed, moving
 
