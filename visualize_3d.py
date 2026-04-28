@@ -1,19 +1,45 @@
-import matplotlib.pyplot as plt
 import numpy as np
+import matplotlib.pyplot as plt
 
-def show_slice(img, title=""):
-    # sécurité : conversion float + normalisation
-    img = np.array(img)
 
-    # normalisation (IMPORTANT pour visibilité)
-    img = (img - img.min()) / (img.max() - img.min() + 1e-8)
+# =========================
+# 🔥 VISUALISATION 3D SLICE
+# =========================
+def show_slice(volume, title=""):
+
+    volume = np.array(volume)
+
+    # sécurité : éviter images vides
+    if volume.max() == volume.min():
+        print(f"⚠️ Volume vide ou constant : {title}")
+        return
+
+    # normalisation (OBLIGATOIRE pour affichage correct)
+    volume = (volume - volume.min()) / (volume.max() - volume.min() + 1e-8)
 
     # slice centrale
-    slice_idx = img.shape[2] // 2
-    slice_img = img[:, :, slice_idx]
+    z = volume.shape[2] // 2
+    slice_img = volume[:, :, z]
 
-    plt.figure(figsize=(5,5))
+    plt.figure(figsize=(5, 5))
     plt.imshow(slice_img, cmap="gray")
     plt.title(title)
     plt.axis("off")
     plt.show()
+
+
+# =========================
+# 🔥 MAIN TEST EXECUTION
+# =========================
+if __name__ == "__main__":
+
+    print("🚀 VISUALIZATION STARTED")
+
+    # TEST SAFE (toujours affiché même sans dataset)
+    dummy = np.random.rand(64, 64, 64)
+
+    show_slice(dummy, "TEST FIXED (dummy)")
+    show_slice(dummy, "TEST MOVING (dummy)")
+    show_slice(dummy, "TEST WARPED (dummy)")
+
+    print("✅ VISUALIZATION FINISHED")
