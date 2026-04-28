@@ -1,3 +1,4 @@
+import os
 import tensorflow as tf
 from model_3d import build_voxelmorph_3d
 from data_loader_3d import load_data
@@ -8,8 +9,20 @@ from losses import total_loss
 # CONFIG
 # =========================
 EPOCHS = 20
-BATCH_SIZE = 1   # 🔥 augmente à 4 si ça passe
+BATCH_SIZE = 1
 LR = 1e-4
+
+
+# 🔥 GPU memory fix (important sur Colab)
+os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
+
+
+# =========================
+# DATA GENERATOR
+# =========================
+def data_generator(fixed, moving):
+    for f, m in zip(fixed, moving):
+        yield f, m
 
 
 # =========================
@@ -35,6 +48,8 @@ def train():
 
     print("🚀 LOADING DATA...")
     train_fixed, train_moving, val_fixed, val_moving = load_data()
+
+    # 🔥 small subset for stability
     train_fixed = train_fixed[:50]
     train_moving = train_moving[:50]
     val_fixed = val_fixed[:10]
@@ -43,14 +58,27 @@ def train():
     print(f"✔ TRAIN SIZE: {len(train_fixed)}")
     print(f"✔ VAL SIZE: {len(val_fixed)}")
 
-    # =========================
-    # DATASET PIPELINE
-    # =========================
-    train_ds = tf.data.Dataset.from_tensor_slices((train_fixed, train_moving))
-    train_ds = train_ds.shuffle(200).batch(BATCH_SIZE).prefetch(tf.data.AUTOTUNE)
 
-    val_ds = tf.data.Dataset.from_tensor_slices((val_fixed, val_moving))
-    val_ds = val_ds.batch(BATCH_SIZE).prefetch(tf.data.AUTOTUNE)
+    # =========================
+    # TF DATASET (SAFE VERSION)
+    # =========================
+    train_ds = tf.data.Dataset.from_generator(
+        lambda: data_generator(train_fixed, train_moving),
+        output_signature=(
+            tf.TensorSpec(shape=(96, 96, 96, 1), dtype=tf.float32),
+            tf.TensorSpec(shape=(96, 96, 96, 1), dtype=tf.float32),
+        )
+    ).batch(BATCH_SIZE)
+
+
+    val_ds = tf.data.Dataset.from_generator(
+        lambda: data_generator(val_fixed, val_moving),
+        output_signature=(
+            tf.TensorSpec(shape=(96, 96, 96, 1), dtype=tf.float32),
+            tf.TensorSpec(shape=(96, 96, 96, 1), dtype=tf.float32),
+        )
+    ).batch(BATCH_SIZE)
+
 
     # =========================
     # MODEL
@@ -60,56 +88,45 @@ def train():
 
     best_val = float("inf")
 
+
     # =========================
-    # EPOCH LOOP
+    # TRAIN LOOP
     # =========================
     for epoch in range(EPOCHS):
 
         print(f"\n🔥 EPOCH {epoch+1}/{EPOCHS}")
 
-        # =========================
-        # TRAIN
-        # =========================
-        epoch_loss = 0.0
+        # -------- TRAIN --------
+        train_loss = 0.0
         steps = 0
 
         for fixed, moving in train_ds:
-
             loss = train_step(model, optimizer, fixed, moving)
-
-            epoch_loss += loss
+            train_loss += loss
             steps += 1
 
-        epoch_loss /= float(steps)
+        train_loss /= steps
+        print(f"📉 TRAIN LOSS: {train_loss.numpy():.5f}")
 
-        print(f"📉 TRAIN LOSS: {epoch_loss.numpy():.5f}")
 
-        # =========================
-        # VALIDATION
-        # =========================
+        # -------- VALIDATION --------
         val_loss = 0.0
-        val_steps = 0
+        vsteps = 0
 
         for fixed, moving in val_ds:
-
             warped, flow = model([moving, fixed], training=False)
             loss = total_loss(fixed, warped, flow)
-
             val_loss += loss
-            val_steps += 1
+            vsteps += 1
 
-        val_loss /= float(val_steps)
-
+        val_loss /= vsteps
         print(f"📊 VAL LOSS: {val_loss.numpy():.5f}")
 
-        # =========================
-        # SAVE BEST MODEL
-        # =========================
-        if val_loss < best_val:
 
+        # -------- SAVE BEST --------
+        if val_loss < best_val:
             best_val = val_loss
             model.save("best_voxelmorph_3d.h5")
-
             print("🏆 SAVED BEST MODEL")
 
 
