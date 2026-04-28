@@ -6,7 +6,7 @@ from losses import total_loss
 # =========================
 # CONFIG
 # =========================
-EPOCHS = 20
+EPOCHS = 3
 BATCH_SIZE = 1
 LR = 1e-4
 
@@ -40,10 +40,10 @@ def train():
     train_fixed, train_moving, val_fixed, val_moving = load_data()
 
     # DEBUG LIMIT (safe training)
-    train_fixed = train_fixed[:50]
-    train_moving = train_moving[:50]
-    val_fixed = val_fixed[:10]
-    val_moving = val_moving[:10]
+    train_fixed = train_fixed[:10]
+    train_moving = train_moving[:10]
+    val_fixed = val_fixed[:5]
+    val_moving = val_moving[:5]
 
     print(f"✔ TRAIN SIZE: {len(train_fixed)}")
     print(f"✔ VAL SIZE: {len(val_fixed)}")
