@@ -1,12 +1,15 @@
 #!/bin/bash
 
-echo "🚀 STAGING FILES..."
+echo "🚀 Sync code + data..."
+
+# ajouter code + data
 git add .
 
-echo "📝 COMMIT..."
-git commit -m "auto update $(date)"
+# éviter commit vide
+git diff --cached --quiet && echo "⚠️ Nothing to commit" && exit 0
 
-echo "📤 PUSH..."
-git push origin main
+git commit -m "sync update"
 
-echo "✅ DONE"
+git push
+
+echo "✅ GitHub updated"
