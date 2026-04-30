@@ -14,7 +14,7 @@ def show_slice(volume, title=""):
         print(f"⚠️ Volume vide ou constant : {title}")
         return
 
-    # normalisation (OBLIGATOIRE pour affichage correct)
+    # normalisation
     volume = (volume - volume.min()) / (volume.max() - volume.min() + 1e-8)
 
     # slice centrale
@@ -25,17 +25,17 @@ def show_slice(volume, title=""):
     plt.imshow(slice_img, cmap="gray")
     plt.title(title)
     plt.axis("off")
-    plt.show()
+
+    plt.show()   # ✅ IMPORTANT POUR COLAB
 
 
 # =========================
-# 🔥 MAIN TEST EXECUTION
+# 🔥 FUNCTION PRINCIPALE
 # =========================
-if __name__ == "__main__":
+def visualize():
 
     print("🚀 VISUALIZATION STARTED")
 
-    # TEST SAFE (toujours affiché même sans dataset)
     dummy = np.random.rand(64, 64, 64)
 
     show_slice(dummy, "TEST FIXED (dummy)")
@@ -43,3 +43,10 @@ if __name__ == "__main__":
     show_slice(dummy, "TEST WARPED (dummy)")
 
     print("✅ VISUALIZATION FINISHED")
+
+
+# =========================
+# RUN LOCAL (optionnel)
+# =========================
+if __name__ == "__main__":
+    visualize()
