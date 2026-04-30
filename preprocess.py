@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import nibabel as nib
-import tensorflow as tf
+from scipy.ndimage import zoom
 from sklearn.model_selection import train_test_split
 
 # =========================
@@ -16,18 +16,22 @@ CACHE_T2 = "data/cache/T2"
 os.makedirs(CACHE_T1, exist_ok=True)
 os.makedirs(CACHE_T2, exist_ok=True)
 
-TARGET_SHAPE = (96, 96, 96) # ⚠️ tu peux mettre (96,96,96) si lent
-
+TARGET_SHAPE = (96, 96, 96)
 
 # =========================
-# LOAD NIFTI
+# LOAD + ORIENTATION FIX
 # =========================
 def load_nifti(path):
-    img = nib.load(path).get_fdata()
-    img = np.nan_to_num(img)
-    img = img.astype(np.float32)
-    return img
+    img = nib.load(path)
 
+    # 🔥 CRUCIAL : orientation standard (RAS)
+    img = nib.as_closest_canonical(img)
+
+    data = img.get_fdata()
+    data = np.nan_to_num(data)
+    data = data.astype(np.float32)
+
+    return data
 
 # =========================
 # NORMALIZATION
@@ -35,25 +39,26 @@ def load_nifti(path):
 def normalize(img):
     img = img - np.mean(img)
     img = img / (np.std(img) + 1e-8)
+
+    # 🔥 stabilisation
+    img = np.clip(img, -5, 5)
+
     return img
 
-
 # =========================
-# RESIZE 3D (STABLE)
+# TRUE 3D RESIZE
 # =========================
 def resize_volume(img, target_shape=TARGET_SHAPE):
 
-    # resize XY
-    img = tf.convert_to_tensor(img, dtype=tf.float32)
-    img = tf.image.resize(img, target_shape[:2])
+    factors = (
+        target_shape[0] / img.shape[0],
+        target_shape[1] / img.shape[1],
+        target_shape[2] / img.shape[2],
+    )
 
-    # resize Z
-    img = tf.transpose(img, [2, 0, 1])  # (Z, X, Y)
-    img = tf.image.resize(img, (target_shape[2], target_shape[0]))
-    img = tf.transpose(img, [1, 2, 0])
+    img = zoom(img, factors, order=1)  # trilinear
 
-    return img.numpy()
-
+    return img
 
 # =========================
 # MATCH T1 / T2
@@ -85,7 +90,6 @@ def get_pairs():
 
     return pairs
 
-
 # =========================
 # MAIN PROCESS
 # =========================
@@ -100,7 +104,7 @@ def process():
     for i, (t1_path, t2_path) in enumerate(pairs):
 
         try:
-            # LOAD
+            # LOAD + FIX ORIENTATION
             t1 = load_nifti(t1_path)
             t2 = load_nifti(t2_path)
 
@@ -108,7 +112,7 @@ def process():
             t1 = normalize(t1)
             t2 = normalize(t2)
 
-            # RESIZE (CRUCIAL)
+            # TRUE 3D RESIZE
             t1 = resize_volume(t1)
             t2 = resize_volume(t2)
 
@@ -116,18 +120,11 @@ def process():
             t1 = np.expand_dims(t1, -1)
             t2 = np.expand_dims(t2, -1)
 
-            # SAVE CACHE
+            # SAVE CACHE (optionnel)
             base = os.path.basename(t1_path).replace(".nii.gz", "").replace(".nii", "")
 
-            np.savez_compressed(
-                os.path.join(CACHE_T1, base + ".npz"),
-                img=t1
-            )
-
-            np.savez_compressed(
-                os.path.join(CACHE_T2, base + ".npz"),
-                img=t2
-            )
+            np.savez_compressed(os.path.join(CACHE_T1, base + ".npz"), img=t1)
+            np.savez_compressed(os.path.join(CACHE_T2, base + ".npz"), img=t2)
 
             fixed_all.append(t1)
             moving_all.append(t2)
@@ -139,7 +136,7 @@ def process():
             continue
 
     # =========================
-    # CONVERT TO ARRAY (NOW SAFE)
+    # CONVERT TO ARRAY
     # =========================
     fixed_all = np.array(fixed_all, dtype=np.float32)
     moving_all = np.array(moving_all, dtype=np.float32)
@@ -165,22 +162,12 @@ def process():
     # =========================
     # SAVE FINAL DATASETS
     # =========================
-    np.savez_compressed(
-        "data/train.npz",
-        fixed=train_fixed,
-        moving=train_moving
-    )
-
-    np.savez_compressed(
-        "data/val.npz",
-        fixed=val_fixed,
-        moving=val_moving
-    )
+    np.savez_compressed("data/train.npz", fixed=train_fixed, moving=train_moving)
+    np.savez_compressed("data/val.npz", fixed=val_fixed, moving=val_moving)
 
     print("\n✅ PROCESS COMPLETED")
     print("TRAIN:", train_fixed.shape)
     print("VAL:", val_fixed.shape)
-
 
 # =========================
 # RUN

@@ -38,7 +38,7 @@ def gradient_loss(flow):
 # =========================
 # TOTAL LOSS VOXELMORPH
 # =========================
-def total_loss(fixed, warped, flow, alpha=1.0):
+def total_loss(fixed, warped, flow, alpha=2.0):
 
     sim = ncc_loss(fixed, warped)
     smooth = gradient_loss(flow)
