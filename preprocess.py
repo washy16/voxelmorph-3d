@@ -7,8 +7,8 @@ from sklearn.model_selection import train_test_split
 # =========================
 # PATHS
 # =========================
-RAW_T1 = "/content/drive/MyDrive/VoxelMorph/data/raw/T1"
-RAW_T2 = "/content/drive/MyDrive/VoxelMorph/data/raw/T2"
+RAW_T1 = "/content/drive/MyDrive/voxelmorph-3d/data/raw/T1"
+RAW_T2 = "/content/drive/MyDrive/voxelmorph-3d/data/raw/T2"
 
 CACHE_T1 = "data/cache/T1"
 CACHE_T2 = "data/cache/T2"
