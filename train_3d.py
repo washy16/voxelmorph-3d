@@ -50,11 +50,12 @@ def train():
     # DATASET
     # =========================
     train_ds = tf.data.Dataset.from_tensor_slices((train_fixed, train_moving))
+
     train_ds = (
         train_ds
-        .shuffle(buffer_size=len(train_fixed))
+        .shuffle(20)  # 🔥 PAS 1000
         .batch(BATCH_SIZE)
-        .prefetch(tf.data.AUTOTUNE)
+        .prefetch(1)  # 🔥 PAS AUTOTUNE
     )
 
     val_ds = tf.data.Dataset.from_tensor_slices((val_fixed, val_moving))
