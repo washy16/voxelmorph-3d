@@ -16,7 +16,6 @@ def build_voxelmorph_3d():
 
     x = tf.keras.layers.Concatenate()([moving, fixed])
 
-    # Encoder U-Net
     x = conv_block(x, 16)
     x = tf.keras.layers.MaxPool3D()(x)
 
@@ -25,16 +24,17 @@ def build_voxelmorph_3d():
 
     x = conv_block(x, 64)
 
-    # Flow field
+    # 🔥 FIX CRITIQUE VOXELMORPH 3D
     flow = tf.keras.layers.Conv3D(
-        3, 3, padding="same", activation=None,
-        kernel_initializer="zeros"
+        3,
+        3,
+        padding="same",
+        activation=None,
+        kernel_initializer="he_normal"   # ✅ FIX IMPORTANT
     )(x)
 
-    # Resize flow to image size (PROPRE)
     flow = tf.keras.layers.UpSampling3D(size=(4,4,4))(flow)
 
-    # Spatial transform
     warped = SpatialTransformer()([moving, flow])
 
     return tf.keras.Model(inputs=[moving, fixed], outputs=[warped, flow])
