@@ -65,31 +65,30 @@ def resize_volume(img, target_shape=TARGET_SHAPE):
 # =========================
 def get_pairs():
 
-    t1_files = sorted([
-        f for f in os.listdir(RAW_T1)
-        if f.endswith(".nii") or f.endswith(".nii.gz")
-    ])
+    t1_files = sorted([f for f in os.listdir(RAW_T1) if "T1" in f])
+    t2_files = sorted([f for f in os.listdir(RAW_T2) if "T2" in f])
 
-    t2_files = sorted([
-        f for f in os.listdir(RAW_T2)
-        if f.endswith(".nii") or f.endswith(".nii.gz")
-    ])
+    t2_dict = {}
+
+    # index T2 par ID
+    for t2 in t2_files:
+        base = t2.replace("-T2.nii.gz", "").replace("_T2.nii.gz", "").replace(".nii.gz", "")
+        t2_dict[base] = t2
 
     pairs = []
 
     for t1 in t1_files:
-        base = t1.split("-T1")[0]
 
-        for t2 in t2_files:
-            if base in t2:
-                pairs.append((
-                    os.path.join(RAW_T1, t1),
-                    os.path.join(RAW_T2, t2)
-                ))
-                break
+        base = t1.replace("-T1.nii.gz", "").replace("_T1.nii.gz", "").replace(".nii.gz", "")
+
+        if base in t2_dict:
+
+            pairs.append((
+                os.path.join(RAW_T1, t1),
+                os.path.join(RAW_T2, t2_dict[base])
+            ))
 
     return pairs
-
 # =========================
 # MAIN PROCESS
 # =========================
