@@ -29,7 +29,10 @@ DATA_PATH = "data"
 TRAIN_FILE = f"{DATA_PATH}/train.npz"
 VAL_FILE = f"{DATA_PATH}/val.npz"
 
-RAW_T1 = f"{DATA_PATH}/raw/T1"
-RAW_T2 = f"{DATA_PATH}/raw/T2"
+RAW_T1 = "/content/drive/MyDrive/voxelmorph_project/data/raw/T1"
+RAW_T2 = "/content/drive/MyDrive/voxelmorph_project/data/raw/T2"
+
+# RAW_T1 = f"{DATA_PATH}/raw/T1"
+# RAW_T2 = f"{DATA_PATH}/raw/T2"
 
 CKPT_PATH = "checkpoints"
