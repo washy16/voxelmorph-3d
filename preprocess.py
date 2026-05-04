@@ -160,3 +160,6 @@ def process():
     print("VAL:", fixed_all[val_idx].shape)
 
     print("\n🧠 READY FOR VOXELMORPH")
+
+    if __name__ == "__main__":
+        process()
