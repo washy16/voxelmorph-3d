@@ -1,9 +1,10 @@
 import numpy as np
 import os
-
 from config import TRAIN_FILE, VAL_FILE
 
-
+# =========================
+# LOAD DATA
+# =========================
 def load_data():
 
     print("📦 Loading dataset (LOCAL)")
@@ -18,7 +19,7 @@ def load_data():
         raise FileNotFoundError(f"❌ VAL FILE NOT FOUND: {VAL_FILE}")
 
     # =========================
-    # LOAD
+    # LOAD NPZ
     # =========================
     train = np.load(TRAIN_FILE)
     val = np.load(VAL_FILE)
@@ -30,24 +31,32 @@ def load_data():
     val_moving = val["moving"]
 
     # =========================
-    # DEBUG PRINT
+    # BASIC DEBUG
     # =========================
     print("✔ TRAIN SHAPE:", train_fixed.shape)
     print("✔ VAL SHAPE:", val_fixed.shape)
 
     # =========================
-    # SAFETY CHECKS
+    # SANITY CHECKS
     # =========================
-    if len(train_fixed) == 0:
-        raise ValueError("❌ TRAIN DATA EMPTY")
+    assert train_fixed.shape == train_moving.shape, "❌ TRAIN mismatch fixed/moving"
+    assert val_fixed.shape == val_moving.shape, "❌ VAL mismatch fixed/moving"
 
-    if len(val_fixed) == 0:
-        raise ValueError("❌ VAL DATA EMPTY")
+    assert len(train_fixed) > 0, "❌ TRAIN EMPTY"
+    assert len(val_fixed) > 0, "❌ VAL EMPTY"
 
-    # éviter bug dtype
-    train_fixed = train_fixed.astype(np.float32)
-    train_moving = train_moving.astype(np.float32)
-    val_fixed = val_fixed.astype(np.float32)
-    val_moving = val_moving.astype(np.float32)
+    # =========================
+    # TYPE SAFETY
+    # =========================
+    train_fixed = np.asarray(train_fixed, dtype=np.float32)
+    train_moving = np.asarray(train_moving, dtype=np.float32)
+    val_fixed = np.asarray(val_fixed, dtype=np.float32)
+    val_moving = np.asarray(val_moving, dtype=np.float32)
+
+    # =========================
+    # VALUE CHECK (IMPORTANT)
+    # =========================
+    print("📊 Fixed range:", train_fixed.min(), train_fixed.max())
+    print("📊 Moving range:", train_moving.min(), train_moving.max())
 
     return train_fixed, train_moving, val_fixed, val_moving

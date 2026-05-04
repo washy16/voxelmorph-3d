@@ -9,25 +9,29 @@ from config import RAW_T1, RAW_T2, MAX_SAMPLES
 TARGET_SHAPE = (96, 96, 96)
 
 # =========================
-# LOAD NIFTI
+# LOAD NIFTI (CLEAN + SAFE)
 # =========================
 def load_nifti(path):
     img = nib.load(path)
+
+    # 🔥 FIX IMPORTANT: canonical orientation
     img = nib.as_closest_canonical(img)
+
     data = img.get_fdata()
     data = np.nan_to_num(data)
+
     return data.astype(np.float32)
 
 # =========================
-# NORMALIZATION (robuste)
+# NORMALIZATION (ROBUST)
 # =========================
 def normalize(img):
-    min_val = img.min()
-    max_val = img.max()
+    min_val = np.percentile(img, 1)
+    max_val = np.percentile(img, 99)
     return (img - min_val) / (max_val - min_val + 1e-8)
 
 # =========================
-# RESIZE 3D VOLUME
+# RESIZE VOLUME
 # =========================
 def resize_volume(img):
     factors = (
@@ -38,7 +42,7 @@ def resize_volume(img):
     return zoom(img, factors, order=1)
 
 # =========================
-# GET FILES
+# FILES LOADER
 # =========================
 def get_files(folder):
     return sorted([
@@ -48,59 +52,73 @@ def get_files(folder):
     ])
 
 # =========================
-# PROCESS DATASET
+# SIMPLE SAFE PAIRING
+# =========================
+def match_pairs(t1_files, t2_files):
+    """
+    ⚠️ IMPORTANT:
+    Ici on suppose même ordre sujet.
+    Si dataset réel avec IDs → améliorer plus tard.
+    """
+    n = min(len(t1_files), len(t2_files))
+    return t1_files[:n], t2_files[:n]
+
+# =========================
+# PROCESS PIPELINE
 # =========================
 def process():
 
-    print("📦 Loading T1 / T2 dataset...")
+    print("📦 Loading dataset (DOCTORAT PIPELINE)")
 
     t1_files = get_files(RAW_T1)
     t2_files = get_files(RAW_T2)
 
-    print(f"🔍 FOUND T1: {len(t1_files)}")
-    print(f"🔍 FOUND T2: {len(t2_files)}")
+    print(f"🔍 T1 found: {len(t1_files)}")
+    print(f"🔍 T2 found: {len(t2_files)}")
 
-    # sécurité
-    assert len(t1_files) > 0, "❌ No T1 files found"
-    assert len(t2_files) > 0, "❌ No T2 files found"
+    assert len(t1_files) > 0
+    assert len(t2_files) > 0
 
-    # limiter samples si besoin
+    # 🔥 pairing safe
+    t1_files, t2_files = match_pairs(t1_files, t2_files)
+
     t1_files = t1_files[:MAX_SAMPLES]
     t2_files = t2_files[:MAX_SAMPLES]
 
     fixed_all = []
     moving_all = []
 
-    # =========================
-    # BUILD PAIRS T2 → T1
-    # =========================
-    for i in range(min(len(t1_files), len(t2_files))):
+    for i, (t1_path, t2_path) in enumerate(zip(t1_files, t2_files)):
 
         try:
             # LOAD
-            t1 = load_nifti(t1_files[i])
-            t2 = load_nifti(t2_files[i])
+            t1 = load_nifti(t1_path)
+            t2 = load_nifti(t2_path)
 
-            # NORMALIZE
+            # SHAPE CHECK
+            if t1.shape != t2.shape:
+                print(f"⚠️ shape mismatch at {i}: {t1.shape} vs {t2.shape}")
+
+            # NORMALIZE (robust percentile)
             t1 = normalize(t1)
             t2 = normalize(t2)
 
-            # RESIZE
+            # RESIZE (same grid)
             t1 = resize_volume(t1)
             t2 = resize_volume(t2)
 
-            # ADD CHANNEL DIM
+            # CHANNEL DIM
             t1 = np.expand_dims(t1, -1)
             t2 = np.expand_dims(t2, -1)
 
-            # STORE
-            fixed_all.append(t1)   # T1 = reference
-            moving_all.append(t2)  # T2 = deformable
+            # FIXED / MOVING (clear semantics)
+            fixed_all.append(t1)   # T1 reference
+            moving_all.append(t2)  # T2 deformable
 
-            print(f"✔ processed {i+1}")
+            print(f"✔ sample {i+1}/{len(t1_files)}")
 
         except Exception as e:
-            print(f"❌ ERROR at sample {i}: {e}")
+            print(f"❌ error {i}: {e}")
 
     # =========================
     # TO ARRAY
@@ -109,52 +127,36 @@ def process():
     moving_all = np.array(moving_all, dtype=np.float32)
 
     # =========================
-    # SPLIT TRAIN / VAL
+    # SPLIT
     # =========================
     idx = np.arange(len(fixed_all))
 
     train_idx, val_idx = train_test_split(
-        idx,
-        test_size=0.2,
-        random_state=42,
-        shuffle=True
+        idx, test_size=0.2, random_state=42
     )
 
-    train_fixed = fixed_all[train_idx]
-    train_moving = moving_all[train_idx]
-
-    val_fixed = fixed_all[val_idx]
-    val_moving = moving_all[val_idx]
-
     # =========================
-    # SAVE DATA
+    # SAVE
     # =========================
     os.makedirs("data", exist_ok=True)
 
     np.savez_compressed(
         "data/train.npz",
-        fixed=train_fixed,
-        moving=train_moving
+        fixed=fixed_all[train_idx],
+        moving=moving_all[train_idx]
     )
 
     np.savez_compressed(
         "data/val.npz",
-        fixed=val_fixed,
-        moving=val_moving
+        fixed=fixed_all[val_idx],
+        moving=moving_all[val_idx]
     )
 
     # =========================
-    # DEBUG INFO
+    # DEBUG
     # =========================
-    print("\n✅ PREPROCESS DONE")
-    print("TRAIN:", train_fixed.shape, train_moving.shape)
-    print("VAL:", val_fixed.shape, val_moving.shape)
+    print("\n✅ PREPROCESS COMPLETE")
+    print("TRAIN:", fixed_all[train_idx].shape)
+    print("VAL:", fixed_all[val_idx].shape)
 
-    print("\n🧠 READY FOR VOXELMORPH TRAINING (T2 → T1)")
-
-
-# =========================
-# RUN
-# =========================
-if __name__ == "__main__":
-    process()
+    print("\n🧠 READY FOR VOXELMORPH")
