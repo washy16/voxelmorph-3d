@@ -1,3 +1,5 @@
+# train_3d.py
+
 import tensorflow as tf
 
 from model_3d import build_voxelmorph_3d
@@ -6,13 +8,11 @@ from losses import total_loss
 from config import LR, EPOCHS, BATCH_SIZE
 
 
-# =========================
-# TRAIN STEP
-# =========================
 @tf.function
 def train_step(model, optimizer, fixed, moving):
 
     with tf.GradientTape() as tape:
+
         warped, flow = model([moving, fixed], training=True)
         loss = total_loss(fixed, warped, flow)
 
@@ -22,44 +22,42 @@ def train_step(model, optimizer, fixed, moving):
     return loss, flow
 
 
-# =========================
-# TRAIN LOOP
-# =========================
 def train():
 
     print("🚀 LOADING DATA")
+
     train_f, train_m, val_f, val_m = load_data()
 
     print("✔ TRAIN:", len(train_f))
     print("✔ VAL:", len(val_f))
 
     train_ds = tf.data.Dataset.from_tensor_slices((train_f, train_m))
-    train_ds = train_ds.shuffle(20).batch(BATCH_SIZE)
+    train_ds = train_ds.shuffle(100).repeat().batch(BATCH_SIZE)
+
+    steps = max(1, len(train_f) // BATCH_SIZE)
 
     model = build_voxelmorph_3d()
-    optimizer = tf.keras.optimizers.Adam(LR)
+    opt = tf.keras.optimizers.Adam(LR)
 
     for epoch in range(EPOCHS):
 
         print(f"\n🔥 EPOCH {epoch+1}/{EPOCHS}")
 
-        total_loss_epoch = 0
-        flow_mag = 0
-        steps = 0
+        loss_sum = 0
+        flow_sum = 0
 
-        for fixed, moving in train_ds:
+        for step, (fixed, moving) in enumerate(train_ds.take(steps)):
 
-            loss, flow = train_step(model, optimizer, fixed, moving)
+            loss, flow = train_step(model, opt, fixed, moving)
 
-            total_loss_epoch += loss.numpy()
-            flow_mag += tf.reduce_mean(tf.abs(flow)).numpy()
-            steps += 1
+            loss_sum += loss.numpy()
+            flow_sum += tf.reduce_mean(tf.abs(flow)).numpy()
 
-        print("📉 LOSS:", total_loss_epoch / steps)
-        print("🌊 FLOW:", flow_mag / steps)
+        print("📉 LOSS:", loss_sum / steps)
+        print("🌊 FLOW:", flow_sum / steps)
 
-    print("💾 SAVING MODEL")
     model.save("model_test.keras")
+    print("💾 MODEL SAVED")
 
 
 if __name__ == "__main__":

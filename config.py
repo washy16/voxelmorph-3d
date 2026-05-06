@@ -9,7 +9,7 @@ IMG_SHAPE = (96, 96, 96, 1)
 # =========================
 LR = 1e-4          # 🔥 important (plus stable que 1e-3)
 BATCH_SIZE = 1
-EPOCHS = 2      # 5 = trop faible pour voir convergence réelle
+EPOCHS = 40    # 5 = trop faible pour voir convergence réelle
 
 # =========================
 # REGULARIZATION

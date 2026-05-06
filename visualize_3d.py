@@ -1,52 +1,60 @@
+# visualize_3d.py
+
 import numpy as np
 import matplotlib.pyplot as plt
 
 
 # =========================
-# 🔥 VISUALISATION 3D SLICE
+# SLICE VIEWER 3D
 # =========================
-def show_slice(volume, title=""):
+def show_slices(volume, title="Volume", axis=2):
 
-    volume = np.array(volume)
+    if len(volume.shape) == 5:
+        volume = volume[0, :, :, :, 0]
 
-    # sécurité : éviter images vides
-    if volume.max() == volume.min():
-        print(f"⚠️ Volume vide ou constant : {title}")
-        return
+    mid = volume.shape[axis] // 2
 
-    # normalisation
-    volume = (volume - volume.min()) / (volume.max() - volume.min() + 1e-8)
-
-    # slice centrale
-    z = volume.shape[2] // 2
-    slice_img = volume[:, :, z]
+    if axis == 0:
+        img = volume[mid, :, :]
+    elif axis == 1:
+        img = volume[:, mid, :]
+    else:
+        img = volume[:, :, mid]
 
     plt.figure(figsize=(5, 5))
-    plt.imshow(slice_img, cmap="gray")
+    plt.imshow(img.T, cmap="gray", origin="lower")
     plt.title(title)
     plt.axis("off")
-
-    plt.show()   # ✅ IMPORTANT POUR COLAB
-
-
-# =========================
-# 🔥 FUNCTION PRINCIPALE
-# =========================
-def visualize():
-
-    print("🚀 VISUALIZATION STARTED")
-
-    dummy = np.random.rand(64, 64, 64)
-
-    show_slice(dummy, "TEST FIXED (dummy)")
-    show_slice(dummy, "TEST MOVING (dummy)")
-    show_slice(dummy, "TEST WARPED (dummy)")
-
-    print("✅ VISUALIZATION FINISHED")
+    plt.show()
 
 
 # =========================
-# RUN LOCAL (optionnel)
+# COMPARE FIXED / MOVING / WARPED
 # =========================
-if __name__ == "__main__":
-    visualize()
+def compare_triplet(fixed, moving, warped):
+
+    print("🧠 VISUALIZATION START")
+
+    show_slices(fixed, "Fixed")
+    show_slices(moving, "Moving")
+    show_slices(warped, "Warped (VoxelMorph)")
+
+
+# =========================
+# FLOW VISUAL (MAGNITUDE)
+# =========================
+def show_flow(flow):
+
+    if len(flow.shape) == 5:
+        flow = flow[0]
+
+    mag = np.sqrt(np.sum(flow**2, axis=-1))
+
+    mid = mag.shape[0] // 2
+
+    plt.figure(figsize=(5, 5))
+    plt.imshow(mag[mid].T, cmap="jet", origin="lower")
+    plt.title("Flow magnitude")
+    plt.axis("off")
+    plt.colorbar()
+    plt.show()
