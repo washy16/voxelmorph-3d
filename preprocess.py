@@ -8,28 +8,28 @@ from config import RAW_T1, RAW_T2, MAX_SAMPLES
 
 TARGET_SHAPE = (96, 96, 96)
 
+
 # =========================
-# LOAD NIFTI (SAFE + CANONICAL)
+# LOAD NIFTI
 # =========================
 def load_nifti(path):
     img = nib.load(path)
-    img = nib.as_closest_canonical(img)  # 🔥 uniform orientation
+    img = nib.as_closest_canonical(img)
     data = img.get_fdata()
-    data = np.nan_to_num(data)
-    return data.astype(np.float32)
+    return np.nan_to_num(data).astype(np.float32)
+
 
 # =========================
-# NORMALIZATION
+# NORMALIZE
 # =========================
 def normalize(img):
-    min_val = np.percentile(img, 1)
-    max_val = np.percentile(img, 99)
-    return (img - min_val) / (max_val - min_val + 1e-8)
+    return (img - img.min()) / (img.max() - img.min() + 1e-8)
+
 
 # =========================
-# ALIGNMENT (RESAMPLE FIX GRID)
+# RESIZE
 # =========================
-def resample(img):
+def resize(img):
     factors = (
         TARGET_SHAPE[0] / img.shape[0],
         TARGET_SHAPE[1] / img.shape[1],
@@ -37,8 +37,9 @@ def resample(img):
     )
     return zoom(img, factors, order=1)
 
+
 # =========================
-# FILE LOADER
+# FILES
 # =========================
 def get_files(folder):
     return sorted([
@@ -47,130 +48,68 @@ def get_files(folder):
         if f.endswith(".nii") or f.endswith(".nii.gz")
     ])
 
+
 # =========================
-# PROCESS PIPELINE
+# PROCESS
 # =========================
 def process():
 
-    print("📦 PREPROCESS STARTED (ALIGNMENT DEBUG PIPELINE)")
+    print("📦 PREPROCESS STARTED (CLEAN)")
 
-    t1_files = get_files(RAW_T1)
-    t2_files = get_files(RAW_T2)
+    t1_files = get_files(RAW_T1)[:MAX_SAMPLES]
+    t2_files = get_files(RAW_T2)[:MAX_SAMPLES]
 
     print(f"🔍 T1: {len(t1_files)} | T2: {len(t2_files)}")
 
-    assert len(t1_files) > 0, "❌ No T1 files"
-    assert len(t2_files) > 0, "❌ No T2 files"
-
     n = min(len(t1_files), len(t2_files))
-    t1_files = t1_files[:n][:MAX_SAMPLES]
-    t2_files = t2_files[:n][:MAX_SAMPLES]
+    print("🔗 matched pairs:", n)
 
-    print(f"🔗 matched pairs: {len(t1_files)}")
-
-    fixed_all = []
-    moving_all = []
+    fixed, moving = [], []
 
     mismatch_count = 0
 
-    for i, (t1_path, t2_path) in enumerate(zip(t1_files, t2_files)):
+    for i in range(n):
 
-        try:
-            # =========================
-            # LOAD
-            # =========================
-            t1 = load_nifti(t1_path)
-            t2 = load_nifti(t2_path)
+        t1 = load_nifti(t1_files[i])
+        t2 = load_nifti(t2_files[i])
 
-            # =========================
-            # 🔥 BEFORE ALIGNMENT CHECK
-            # =========================
-            if t1.shape != t2.shape:
-                mismatch_count += 1
-                print(f"⚠️ BEFORE ALIGNMENT {i}: T1={t1.shape} | T2={t2.shape}")
+        # DEBUG mismatch
+        if t1.shape != t2.shape:
+            print(f"⚠️ BEFORE ALIGNMENT {i}: T1={t1.shape} | T2={t2.shape}")
+            mismatch_count += 1
 
-            # =========================
-            # NORMALIZATION
-            # =========================
-            t1 = normalize(t1)
-            t2 = normalize(t2)
+        t1 = normalize(resize(t1))
+        t2 = normalize(resize(t2))
 
-            # =========================
-            # ALIGNMENT (FORCED GRID)
-            # =========================
-            t1 = resample(t1)
-            t2 = resample(t2)
+        t1 = np.expand_dims(t1, -1)
+        t2 = np.expand_dims(t2, -1)
 
-            # =========================
-            # 🔥 AFTER ALIGNMENT CHECK
-            # =========================
-            if t1.shape != t2.shape:
-                print(f"❌ STILL MISMATCH AFTER ALIGNMENT {i}")
-            else:
-                print(f"✔ AFTER ALIGNMENT {i}: {t1.shape} | {t2.shape}")
+        fixed.append(t1)
+        moving.append(t2)
 
-            # =========================
-            # CHANNEL DIM
-            # =========================
-            t1 = np.expand_dims(t1, -1)
-            t2 = np.expand_dims(t2, -1)
+        print(f"✔ processed {i+1}/{n}")
 
-            fixed_all.append(t1)
-            moving_all.append(t2)
+    fixed = np.array(fixed, dtype=np.float32)
+    moving = np.array(moving, dtype=np.float32)
 
-            print(f"✔ processed {i+1}/{len(t1_files)}")
+    idx = np.arange(len(fixed))
+    train_idx, val_idx = train_test_split(idx, test_size=0.2, random_state=42)
 
-        except Exception as e:
-            print(f"❌ error {i}: {e}")
-
-    # =========================
-    # TO ARRAY
-    # =========================
-    fixed_all = np.array(fixed_all, dtype=np.float32)
-    moving_all = np.array(moving_all, dtype=np.float32)
-
-    # =========================
-    # TRAIN / VAL SPLIT
-    # =========================
-    idx = np.arange(len(fixed_all))
-
-    train_idx, val_idx = train_test_split(
-        idx,
-        test_size=0.2,
-        random_state=42,
-        shuffle=True
-    )
-
-    # =========================
-    # SAVE DATASET
-    # =========================
     os.makedirs("data", exist_ok=True)
 
-    np.savez_compressed(
-        "data/train.npz",
-        fixed=fixed_all[train_idx],
-        moving=moving_all[train_idx]
-    )
+    np.savez_compressed("data/train.npz",
+                        fixed=fixed[train_idx],
+                        moving=moving[train_idx])
 
-    np.savez_compressed(
-        "data/val.npz",
-        fixed=fixed_all[val_idx],
-        moving=moving_all[val_idx]
-    )
+    np.savez_compressed("data/val.npz",
+                        fixed=fixed[val_idx],
+                        moving=moving[val_idx])
 
-    # =========================
-    # FINAL REPORT
-    # =========================
-    print("\n✅ PREPROCESS DONE")
-    print(f"⚠️ total mismatches BEFORE alignment: {mismatch_count}")
-    print("TRAIN:", fixed_all[train_idx].shape)
-    print("VAL:", fixed_all[val_idx].shape)
-
-    print("\n🧠 READY FOR VOXELMORPH TRAINING")
+    print("\n✅ DONE")
+    print("⚠️ mismatches:", mismatch_count)
+    print("TRAIN:", fixed[train_idx].shape)
+    print("VAL:", fixed[val_idx].shape)
 
 
-# =========================
-# ENTRY POINT
-# =========================
 if __name__ == "__main__":
     process()
