@@ -1,21 +1,25 @@
-# preprocess.py
-
 import numpy as np
 from pair_selection import select_best_pairs
 
 
-print("📦 PREPROCESS STARTED (PASPER PIPELINE)")
+print("📦 PREPROCESS STARTED (TRAIN/VAL PIPELINE)")
 
-data = np.load("data/raw.npz")
+# =========================
+# LOAD TRAIN DATA ONLY
+# =========================
+data = np.load("data/train.npz")
 images = data["images"]
 
-print("🔍 TOTAL IMAGES:", len(images))
+print("🔍 IMAGES LOADED:", len(images))
 
+# =========================
+# BEST PAIRS (PASPER)
+# =========================
 pairs = select_best_pairs(images, top_k=10)
 
-print("\n✔ BEST PAIRS SELECTED:", len(pairs))
+print("\n✔ BEST PAIRS:", len(pairs))
 
-mismatches = 0
+mismatch = 0
 
 for idx, (i, j) in enumerate(pairs):
 
@@ -24,19 +28,15 @@ for idx, (i, j) in enumerate(pairs):
 
     print(f"\nPAIR {idx}: {i} ↔ {j}")
 
-    print("BEFORE ALIGNMENT:")
+    print("BEFORE:")
     print("T1:", img1.shape)
     print("T2:", img2.shape)
 
     if img1.shape != img2.shape:
-        print("⚠️ MISMATCH DETECTED")
-        mismatches += 1
+        print("⚠️ MISMATCH")
+        mismatch += 1
     else:
-        print("✔ SAME SHAPE")
+        print("✔ OK")
 
-    print("AFTER ALIGNMENT (placeholder 96³)")
-    print("T1 → (96,96,96)")
-    print("T2 → (96,96,96)")
-
-print("\n⚠️ TOTAL MISMATCHES:", mismatches)
+print("\n⚠️ TOTAL MISMATCH:", mismatch)
 print("✅ PREPROCESS DONE")
