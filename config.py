@@ -9,7 +9,7 @@ IMG_SHAPE = (96, 96, 96, 1)
 # =========================
 LR = 1e-4          # 🔥 important (plus stable que 1e-3)
 BATCH_SIZE = 1
-EPOCHS = 20        # 5 = trop faible pour voir convergence réelle
+EPOCHS = 2      # 5 = trop faible pour voir convergence réelle
 
 # =========================
 # REGULARIZATION
@@ -19,7 +19,7 @@ LAMBDA_REG = 0.01   # stabilise fortement le flow
 # =========================
 # DATASET (DEBUG LIMIT)
 # =========================
-MAX_SAMPLES = 10
+MAX_SAMPLES = 4
 
 # =========================
 # PATHS
