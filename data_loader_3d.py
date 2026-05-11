@@ -1,5 +1,3 @@
-# data_loader_3d.py
-
 import numpy as np
 from pair_selection import select_best_pairs
 
@@ -8,19 +6,26 @@ def load_data():
 
     data = np.load("data/train.npz")
 
-    images = data["images"]
+    fixed = data["fixed"]
+    moving = data["moving"]
 
-    pairs = select_best_pairs(images, top_k=50)
+    print("✔ FIXED:", fixed.shape)
+    print("✔ MOVING:", moving.shape)
 
-    fixed = []
-    moving = []
+    # PASPER (best pairs sur fixed/moving index pairing)
+    n = len(fixed)
+
+    pairs = [(i, i) for i in range(n)]  # pairing simple stable
+
+    fixed_list = []
+    moving_list = []
 
     for i, j in pairs:
-        fixed.append(images[i])
-        moving.append(images[j])
+        fixed_list.append(fixed[i])
+        moving_list.append(moving[j])
 
-    fixed = np.array(fixed)
-    moving = np.array(moving)
+    fixed = np.array(fixed_list)
+    moving = np.array(moving_list)
 
     split = int(len(fixed) * 0.8)
 

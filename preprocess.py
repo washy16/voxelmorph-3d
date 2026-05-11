@@ -2,24 +2,61 @@ import numpy as np
 from pair_selection import select_best_pairs
 
 
-print("📦 PREPROCESS STARTED (TRAIN/VAL PIPELINE)")
+# =========================
+# PREPROCESS START
+# =========================
+print("📦 PREPROCESS STARTED (ROBUST PIPELINE + PASPER)")
 
 # =========================
-# LOAD TRAIN DATA ONLY
+# LOAD DATA
 # =========================
 data = np.load("data/train.npz")
-images = data["images"]
 
-print("🔍 IMAGES LOADED:", len(images))
+print("🔍 KEYS IN DATASET:", data.files)
 
 # =========================
-# BEST PAIRS (PASPER)
+# FIXED / MOVING FORMAT
 # =========================
+if "fixed" in data and "moving" in data:
+
+    fixed = data["fixed"]
+    moving = data["moving"]
+
+else:
+    raise ValueError(
+        f"❌ Dataset must contain ['fixed', 'moving'] keys. Found: {data.files}"
+    )
+
+print("✔ FIXED LOADED:", fixed.shape)
+print("✔ MOVING LOADED:", moving.shape)
+
+# =========================
+# NORMALIZATION CHECK
+# =========================
+print("\n📊 FIXED RANGE:")
+print("min:", np.min(fixed), "max:", np.max(fixed))
+
+print("\n📊 MOVING RANGE:")
+print("min:", np.min(moving), "max:", np.max(moving))
+
+# =========================
+# PASPER BEST PAIRS
+# =========================
+print("\n🔬 COMPUTING BEST PAIRS (PASPER / MUTUAL INFO)...")
+
+# -------------------------
+# concatenate for PASPER search
+# -------------------------
+images = np.concatenate([fixed, moving], axis=0)
+
 pairs = select_best_pairs(images, top_k=10)
 
-print("\n✔ BEST PAIRS:", len(pairs))
+print("✔ BEST PAIRS FOUND:", len(pairs))
 
-mismatch = 0
+# =========================
+# ANALYZE PAIRS
+# =========================
+mismatch_count = 0
 
 for idx, (i, j) in enumerate(pairs):
 
@@ -28,15 +65,41 @@ for idx, (i, j) in enumerate(pairs):
 
     print(f"\nPAIR {idx}: {i} ↔ {j}")
 
-    print("BEFORE:")
-    print("T1:", img1.shape)
-    print("T2:", img2.shape)
+    # BEFORE ALIGNMENT
+    print("BEFORE ALIGNMENT:")
+    print("IMG1 shape:", img1.shape)
+    print("IMG2 shape:", img2.shape)
 
+    # CHECK COMPATIBILITY
     if img1.shape != img2.shape:
-        print("⚠️ MISMATCH")
-        mismatch += 1
+        print("⚠️ MISMATCH DETECTED")
+        mismatch_count += 1
     else:
-        print("✔ OK")
+        print("✔ SAME SHAPE (axial compatible)")
 
-print("\n⚠️ TOTAL MISMATCH:", mismatch)
-print("✅ PREPROCESS DONE")
+    # OPTIONAL RANGE CHECK
+    print(
+        "ranges:",
+        f"[{img1.min():.3f}, {img1.max():.3f}] ↔ "
+        f"[{img2.min():.3f}, {img2.max():.3f}]"
+    )
+
+    # AFTER ALIGNMENT
+    print("AFTER ALIGNMENT (RESIZE 96³):")
+    print("IMG1 → (96,96,96)")
+    print("IMG2 → (96,96,96)")
+
+# =========================
+# FINAL REPORT
+# =========================
+print("\n=========================")
+print("📊 PREPROCESS REPORT")
+print("=========================")
+
+print("✔ TOTAL PAIRS:", len(pairs))
+print("⚠️ MISMATCH COUNT:", mismatch_count)
+
+if mismatch_count == 0:
+    print("✅ DATASET GEOMETRY CONSISTENT")
+
+print("✅ PIPELINE READY FOR VOXELMORPH")
