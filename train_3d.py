@@ -7,6 +7,7 @@ from losses import total_loss
 from config import LR, EPOCHS, BATCH_SIZE
 
 
+
 # =========================
 # TRAIN STEP
 # =========================
