@@ -9,7 +9,7 @@ IMG_SHAPE = (96, 96, 96, 1)
 # =========================
 LR = 1e-4          # 🔥 important (plus stable que 1e-3)
 BATCH_SIZE = 1
-EPOCHS = 40    # 5 = trop faible pour voir convergence réelle
+EPOCHS = 2   # 5 = trop faible pour voir convergence réelle
 
 # =========================
 # REGULARIZATION
@@ -29,10 +29,10 @@ DATA_PATH = "data"
 TRAIN_FILE = f"{DATA_PATH}/train.npz"
 VAL_FILE = f"{DATA_PATH}/val.npz"
 
-RAW_T1 = "/content/drive/MyDrive/voxelmorph-3d/data/raw/T1"
-RAW_T2 = "/content/drive/MyDrive/voxelmorph-3d/data/raw/T2"
+# RAW_T1 = "/content/drive/MyDrive/voxelmorph-3d/data/raw/T1"
+# RAW_T2 = "/content/drive/MyDrive/voxelmorph-3d/data/raw/T2"
 
-# RAW_T1 = f"{DATA_PATH}/raw/T1"
-# RAW_T2 = f"{DATA_PATH}/raw/T2"
+RAW_T1 = f"{DATA_PATH}/raw/T1"
+RAW_T2 = f"{DATA_PATH}/raw/T2"
 
 CKPT_PATH = "checkpoints"

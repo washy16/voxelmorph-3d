@@ -1,60 +1,135 @@
 # visualize_3d.py
 
 import numpy as np
+
+import matplotlib
+matplotlib.use("TkAgg")
+
 import matplotlib.pyplot as plt
 
 
 # =========================
-# SLICE VIEWER 3D
+# PREPARE VOLUME
+# =========================
+def prepare_volume(volume):
+
+    volume = np.array(volume)
+
+    # (1, H, W, D, 1)
+    if volume.ndim == 5:
+        volume = volume[0, :, :, :, 0]
+
+    # (H, W, D, 1)
+    elif volume.ndim == 4 and volume.shape[-1] == 1:
+        volume = volume[:, :, :, 0]
+
+    if volume.ndim != 3:
+        raise ValueError(
+            f"Volume must be 3D after processing. Got shape: {volume.shape}"
+        )
+
+    return volume
+
+
+# =========================
+# SHOW SINGLE SLICE
 # =========================
 def show_slices(volume, title="Volume", axis=2):
 
-    if len(volume.shape) == 5:
-        volume = volume[0, :, :, :, 0]
+    volume = prepare_volume(volume)
 
+    # Slice centrale
     mid = volume.shape[axis] // 2
 
     if axis == 0:
         img = volume[mid, :, :]
+
     elif axis == 1:
         img = volume[:, mid, :]
+
     else:
         img = volume[:, :, mid]
 
-    plt.figure(figsize=(5, 5))
-    plt.imshow(img.T, cmap="gray", origin="lower")
+    plt.figure(figsize=(6, 6))
+
+    plt.imshow(
+        img.T,
+        cmap="gray",
+        origin="lower"
+    )
+
     plt.title(title)
     plt.axis("off")
-    plt.show()
+
+    plt.tight_layout()
+    plt.show(block=True)
 
 
 # =========================
-# COMPARE FIXED / MOVING / WARPED
+# COMPARE 3 VOLUMES
 # =========================
-def compare_triplet(fixed, moving, warped):
+def compare_triplet(fixed, moving, warped, axis=2):
 
-    print("🧠 VISUALIZATION START")
+    print("\n🧠 VISUALIZATION START\n")
 
-    show_slices(fixed, "Fixed")
-    show_slices(moving, "Moving")
-    show_slices(warped, "Warped (VoxelMorph)")
+    show_slices(fixed, "Fixed", axis)
+    show_slices(moving, "Moving", axis)
+    show_slices(warped, "Warped (VoxelMorph)", axis)
 
 
 # =========================
-# FLOW VISUAL (MAGNITUDE)
+# SHOW FLOW MAGNITUDE
 # =========================
 def show_flow(flow):
 
-    if len(flow.shape) == 5:
+    flow = np.array(flow)
+
+    # (1, H, W, D, 3)
+    if flow.ndim == 5:
         flow = flow[0]
 
-    mag = np.sqrt(np.sum(flow**2, axis=-1))
+    if flow.ndim != 4:
+        raise ValueError(
+            f"Flow must be 4D. Got shape: {flow.shape}"
+        )
 
-    mid = mag.shape[0] // 2
+    # Magnitude du déplacement
+    magnitude = np.sqrt(np.sum(flow ** 2, axis=-1))
 
-    plt.figure(figsize=(5, 5))
-    plt.imshow(mag[mid].T, cmap="jet", origin="lower")
-    plt.title("Flow magnitude")
+    mid = magnitude.shape[2] // 2
+
+    plt.figure(figsize=(6, 6))
+
+    plt.imshow(
+        magnitude[:, :, mid].T,
+        cmap="jet",
+        origin="lower"
+    )
+
+    plt.title("Flow Magnitude")
     plt.axis("off")
+
     plt.colorbar()
-    plt.show()
+
+    plt.tight_layout()
+    plt.show(block=True)
+
+
+# =========================
+# QUICK TEST
+# =========================
+if __name__ == "__main__":
+
+    print("✅ TEST VISUALIZE_3D")
+
+    # Faux volume 3D
+    x = np.random.rand(96, 96, 96)
+
+    # Faux flow
+    flow = np.random.rand(96, 96, 96, 3)
+
+    show_slices(x, "Test Volume")
+
+    show_flow(flow)
+
+    print("✅ FINISHED")

@@ -1,105 +1,119 @@
+import os
 import numpy as np
-from pair_selection import select_best_pairs
+import nibabel as nib
+from scipy.ndimage import zoom
+from config import RAW_T1, RAW_T2, TRAIN_FILE
 
-
-# =========================
-# PREPROCESS START
-# =========================
-print("📦 PREPROCESS STARTED (ROBUST PIPELINE + PASPER)")
+print("📦 PREPROCESS START (IXI + ROBUST PIPELINE)")
 
 # =========================
-# LOAD DATA
+# TARGET SHAPE
 # =========================
-data = np.load("data/train.npz")
-
-print("🔍 KEYS IN DATASET:", data.files)
+TARGET_SHAPE = (96, 96, 96)
 
 # =========================
-# FIXED / MOVING FORMAT
+# LOAD FILES
 # =========================
-if "fixed" in data and "moving" in data:
+t1_files = [f for f in os.listdir(RAW_T1) if "T1" in f and (f.endswith(".nii") or f.endswith(".nii.gz"))]
+t2_files = [f for f in os.listdir(RAW_T2) if "T2" in f and (f.endswith(".nii") or f.endswith(".nii.gz"))]
 
-    fixed = data["fixed"]
-    moving = data["moving"]
+print("✔ T1 files:", len(t1_files))
+print("✔ T2 files:", len(t2_files))
 
-else:
-    raise ValueError(
-        f"❌ Dataset must contain ['fixed', 'moving'] keys. Found: {data.files}"
+# =========================
+# EXTRACT PATIENT ID (IXI FORMAT)
+# =========================
+def get_id(fname):
+    name = fname.replace(".nii.gz", "").replace(".nii", "")
+
+    if "-T1" in name:
+        return name.replace("-T1", "")
+    if "-T2" in name:
+        return name.replace("-T2", "")
+
+    return name
+
+t1_dict = {get_id(f): f for f in t1_files}
+t2_dict = {get_id(f): f for f in t2_files}
+
+common_ids = sorted(set(t1_dict.keys()) & set(t2_dict.keys()))
+
+print("✔ MATCHED PAIRS:", len(common_ids))
+print("⚠️ UNMATCHED T1:", len(t1_dict) - len(common_ids))
+print("⚠️ UNMATCHED T2:", len(t2_dict) - len(common_ids))
+
+if len(common_ids) == 0:
+    raise ValueError("❌ No matching T1/T2 pairs found!")
+
+# =========================
+# LOAD NIFTI
+# =========================
+def load_nii(path):
+    img = nib.load(path)
+    data = img.get_fdata().astype(np.float32)
+    return data
+
+# =========================
+# RESAMPLE FUNCTION
+# =========================
+def resize_3d(volume):
+    factors = (
+        TARGET_SHAPE[0] / volume.shape[0],
+        TARGET_SHAPE[1] / volume.shape[1],
+        TARGET_SHAPE[2] / volume.shape[2],
     )
-
-print("✔ FIXED LOADED:", fixed.shape)
-print("✔ MOVING LOADED:", moving.shape)
+    return zoom(volume, factors, order=1)
 
 # =========================
-# NORMALIZATION CHECK
+# BUILD DATASET
 # =========================
-print("\n📊 FIXED RANGE:")
-print("min:", np.min(fixed), "max:", np.max(fixed))
+fixed_list = []
+moving_list = []
 
-print("\n📊 MOVING RANGE:")
-print("min:", np.min(moving), "max:", np.max(moving))
+for i, pid in enumerate(common_ids):
 
-# =========================
-# PASPER BEST PAIRS
-# =========================
-print("\n🔬 COMPUTING BEST PAIRS (PASPER / MUTUAL INFO)...")
+    print(f"🔄 Processing {i+1}/{len(common_ids)} : {pid}")
 
-# -------------------------
-# concatenate for PASPER search
-# -------------------------
-images = np.concatenate([fixed, moving], axis=0)
+    p1 = os.path.join(RAW_T1, t1_dict[pid])
+    p2 = os.path.join(RAW_T2, t2_dict[pid])
 
-pairs = select_best_pairs(images, top_k=10)
+    fixed = load_nii(p1)
+    moving = load_nii(p2)
 
-print("✔ BEST PAIRS FOUND:", len(pairs))
+    # resize
+    fixed = resize_3d(fixed)
+    moving = resize_3d(moving)
 
-# =========================
-# ANALYZE PAIRS
-# =========================
-mismatch_count = 0
+    # normalize per volume
+    fixed = (fixed - fixed.min()) / (fixed.max() - fixed.min() + 1e-8)
+    moving = (moving - moving.min()) / (moving.max() - moving.min() + 1e-8)
 
-for idx, (i, j) in enumerate(pairs):
-
-    img1 = images[i]
-    img2 = images[j]
-
-    print(f"\nPAIR {idx}: {i} ↔ {j}")
-
-    # BEFORE ALIGNMENT
-    print("BEFORE ALIGNMENT:")
-    print("IMG1 shape:", img1.shape)
-    print("IMG2 shape:", img2.shape)
-
-    # CHECK COMPATIBILITY
-    if img1.shape != img2.shape:
-        print("⚠️ MISMATCH DETECTED")
-        mismatch_count += 1
-    else:
-        print("✔ SAME SHAPE (axial compatible)")
-
-    # OPTIONAL RANGE CHECK
-    print(
-        "ranges:",
-        f"[{img1.min():.3f}, {img1.max():.3f}] ↔ "
-        f"[{img2.min():.3f}, {img2.max():.3f}]"
-    )
-
-    # AFTER ALIGNMENT
-    print("AFTER ALIGNMENT (RESIZE 96³):")
-    print("IMG1 → (96,96,96)")
-    print("IMG2 → (96,96,96)")
+    fixed_list.append(fixed)
+    moving_list.append(moving)
 
 # =========================
-# FINAL REPORT
+# STACK
 # =========================
-print("\n=========================")
-print("📊 PREPROCESS REPORT")
-print("=========================")
+fixed = np.stack(fixed_list).astype(np.float32)
+moving = np.stack(moving_list).astype(np.float32)
 
-print("✔ TOTAL PAIRS:", len(pairs))
-print("⚠️ MISMATCH COUNT:", mismatch_count)
+# add channel dimension
+fixed = fixed[..., np.newaxis]
+moving = moving[..., np.newaxis]
 
-if mismatch_count == 0:
-    print("✅ DATASET GEOMETRY CONSISTENT")
+print("✔ FINAL FIXED:", fixed.shape)
+print("✔ FINAL MOVING:", moving.shape)
 
-print("✅ PIPELINE READY FOR VOXELMORPH")
+# =========================
+# SAVE DATASET
+# =========================
+os.makedirs(os.path.dirname(TRAIN_FILE), exist_ok=True)
+
+np.savez_compressed(
+    TRAIN_FILE,
+    fixed=fixed,
+    moving=moving
+)
+
+print("💾 SAVED:", TRAIN_FILE)
+print("🚀 PREPROCESS COMPLETE")
